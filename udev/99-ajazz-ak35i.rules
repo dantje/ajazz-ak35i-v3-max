@@ -1,0 +1,16 @@
+# Ajazz AK35I V3 MAX (VID=0x0C45, PID=0x8009)
+#
+# Grants access to the keyboard's HID interfaces without requiring root.
+#
+#   TAG+="uaccess"   — grants access to the physically logged-in user
+#                      automatically (seat-based, via systemd-logind).
+#                      Works for desktop/local sessions with no user action.
+#
+#   GROUP="plugdev"  — grants access to members of the plugdev group.
+#   MODE="0660"      — required for the group assignment to be effective.
+#                      Use this for SSH sessions or other non-seat environments:
+#                        sudo usermod -aG plugdev $USER
+#                      (log out and back in for the group change to take effect)
+#
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8009", \
+    MODE="0660", GROUP="plugdev", TAG+="uaccess"

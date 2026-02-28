@@ -1,0 +1,9 @@
+[Desktop Entry]
+Type=Application
+Name=Ajazz Keyboard
+Comment=Control Ajazz AK35I V3 MAX display and lighting
+Exec=ajazz-gtk
+Icon=preferences-desktop-keyboard-symbolic
+Terminal=false
+Categories=Settings;HardwareSettings;
+Keywords=keyboard;ajazz;lighting;display;rgb;
