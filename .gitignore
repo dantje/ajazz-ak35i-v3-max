@@ -1,0 +1,13 @@
+build/
+
+# editor artifacts
+*.swp
+*.swo
+*~
+*.bak
+
+# macOS
+.DS_Store
+
+# CMake user presets (machine-specific)
+CMakeUserPresets.json
