@@ -6,6 +6,8 @@
 |-------|-------|
 | USB VID | `0x0C45` (SONiX / Microdia) |
 | USB PID | `0x8009` |
+| USB Manufacturer string | `SONiX` |
+| USB Product string | `USB KEYBOARD` |
 | Label on device | `AK35I V3 MAX` |
 | MCU | SONiX SN32F290 (ARM Cortex-M0+) |
 | Display | 1.14-inch TFT, 240×135 pixels, RGB565, autonomous RTC |
@@ -36,7 +38,10 @@ The keyboard enumerates as four HID interfaces:
 | hidraw0 | 0 | `0x0001` | Boot keyboard (keystrokes) |
 | hidraw1 | 1 | `0x000C` | Consumer / media keys |
 | hidraw2 | 2 | `0xFF68` | Display image data — 4096-byte OUT reports |
-| **hidraw3** | **3** | **`0xFF13`** | **Command channel** — 64-byte Feature reports |
+| **hidraw3** | **3** | **`0xFF13`** | **Command channel** — 64-byte Feature + IN + OUT reports |
+
+The HID report descriptor for interface 3 declares **no report IDs**;
+every report on that interface is exactly **64 bytes**.
 
 ---
 
@@ -118,6 +123,7 @@ discarded after each command that requires it (see operation sequences in §7).
 |------|------|------|-----|----------|
 | `0x02` | `CMD_SAVE` | `0x00` | yes | Commit / persist the current transaction |
 | `0x18` | `CMD_START` | `0x01` | yes | Begin a session |
+| `0xF0` | `CMD_FINISH` | `0x01` | no | End transaction (post-save cleanup; can be omitted) |
 
 ### 6.2 Write Commands
 
@@ -125,7 +131,46 @@ discarded after each command that requires it (see operation sequences in §7).
 |------|------|------|-----|----------|
 | `0x13` | `CMD_LIGHTING` | `0x01` | yes | Write lighting mode |
 | `0x28` | `CMD_TIME` | `0x01` | yes | Begin a time-sync transaction |
+| `0x23` | `CMD_CUSTOM_LIGHT` | `0x09` (9 packets) | yes | Upload per-key custom RGB lighting |
 | `0x72` | `CMD_IMAGE` | chunk count (16-bit LE) | yes | Begin image/GIF upload |
+
+### 6.3 Read Commands
+
+Read commands retrieve data from the device. The read protocol works as
+follows:
+
+1. Send `[04 CMD 00 00 00 00 00 00 01 00 … 00]` via `HIDIOCSFEATURE`.
+2. Wait 35 ms, then call `HIDIOCGFEATURE` — the first response is an
+   **echo/ACK** (the command packet echoed back with byte[3] set to
+   `0x01`). **Discard this packet.**
+3. Call `HIDIOCGFEATURE` repeatedly (with 35 ms gaps) to read the actual
+   data packets (64 bytes each).
+
+To retrieve K data packets, call `HIDIOCGFEATURE` a total of **K + 1**
+times and discard the first result.
+
+| Byte | Name | Data packets | Function |
+|------|------|-------------|----------|
+| `0x05` | `CMD_READ_ID` | 1 (64 B) | Device ID: capabilities word, VID, PID, firmware version |
+| `0x12` | `CMD_READ_LIGHTING` | 1 (64 B) | Current lighting config (same layout as write payload §7.2.1) |
+| `0xF5` | `CMD_READ_PERKEY` | 9 (576 B) | Live per-key RGB state (see §7.4) |
+
+#### 6.3.1 CMD 0x05 — Device ID Payload
+
+```
+Byte:  0    1    2    3    4    5    6    7    8    9   10   11
+     +----+----+----+----+----+----+----+----+----+----+----+----+
+     | 40 | 30 | 00 | 00 | 45 | 0C | 09 | 80 | xx | xx | FF | FF |
+     +----+----+----+----+----+----+----+----+----+----+----+----+
+```
+
+| Field | Bytes | Description |
+|-------|-------|-------------|
+| Capabilities | 0–3 | `0x3040` (constant) |
+| VID | 4–5 | USB VID, little-endian (`0x0C45`) |
+| PID | 6–7 | USB PID, little-endian (`0x8009`) |
+| Firmware version | 8–9 | LE uint16 (e.g. `0x0127` = V1.27) |
+| End marker | 10–11 | `0xFFFF` |
 
 ---
 
@@ -184,9 +229,10 @@ Byte:  8       9      10      11–61   62      63
 ```
 Step  Packet                                                    ACK
 ────  ──────────────────────────────────────────────────────    ───
- 1.   CMD_LIGHTING  [04 13 00 00 00 00 00 00 01 00 … 00]       yes
- 2.   Lighting data (see §7.2.1)                               yes
- 3.   CMD_SAVE      [04 02 00 00 00 00 00 00 00 00 … 00]       yes
+ 1.   CMD_START     [04 18 00 00 00 00 00 00 01 00 … 00]       yes
+ 2.   CMD_LIGHTING  [04 13 00 00 00 00 00 00 01 00 … 00]       yes
+ 3.   Lighting data (see §7.2.1)                               no
+ 4.   CMD_SAVE      [04 02 00 00 00 00 00 00 00 00 … 00]       yes
 ```
 
 #### 7.2.1 Lighting Data Payload (64 bytes)
@@ -241,6 +287,7 @@ Byte: 12–61   62      63
 | `0x11` | pulsating | Pulsating |
 | `0x12` | tilt | Tilt |
 | `0x13` | shuttle | Shuttle |
+| `0x80` | custom | Per-key custom RGB (activate after uploading per-key data via CMD 0x23) |
 
 ### 7.3 Image / GIF Upload
 
@@ -346,6 +393,70 @@ chunks      = ceil(total_bytes / 4096)
 | 141 (max) | 9,137,056 | 2,231 | ~78 s |
 
 Upload rate is ~35 ms/chunk (one ACK round-trip per chunk).
+
+### 7.4 Per-Key Custom Lighting
+
+#### 7.4.1 Writing Per-Key Data (CMD 0x23)
+
+Uploads 144 per-key RGB entries to flash. After writing, set lighting
+mode to `0x80` via the lighting sequence (§7.2) to activate the per-key
+renderer.
+
+```
+Step  Packet                                                    ACK
+────  ──────────────────────────────────────────────────────    ───
+ 1.   CMD_START        [04 18 00 00 00 00 00 00 01 00 … 00]    yes
+ 2.   CMD_CUSTOM_LIGHT [04 23 00 00 00 00 00 00 09 00 … 00]    yes
+ 3.   Per-key data (9 × 64-byte packets = 576 bytes)           no
+ 4.   CMD_SAVE         [04 02 00 00 00 00 00 00 00 00 … 00]    yes
+```
+
+#### 7.4.2 Reading Live Per-Key State (CMD 0xF5)
+
+Returns the live per-key RGB state from the firmware, reflecting both the
+base animation colours and any Fn+~ per-key overrides.
+
+No CMD_START is needed.
+
+```
+Step  Packet                                                    ACK
+────  ──────────────────────────────────────────────────────    ───
+ 1.   CMD_READ_PERKEY  [04 F5 00 00 00 00 00 00 09 00 … 00]    yes*
+ 2.   9 × 64-byte data packets (576 bytes)                     n/a
+ 3.   CMD_SAVE         [04 02 00 00 00 00 00 00 00 00 … 00]    yes
+ 4.   CMD_FINISH       [04 F0 00 00 00 00 00 00 00 00 … 00]    no
+
+ * The first HIDIOCGFEATURE response is an echo/ACK — discard it,
+   then read 9 data packets (see §6.3 read protocol).
+```
+
+**State machine cleanup:** after reading all 9 data packets the firmware
+enters a wait-for-save state. Steps 3–4 (CMD_SAVE + CMD_FINISH) reset
+the state machine to idle. Without this cleanup, subsequent reads return
+stale data.
+
+#### 7.4.3 Per-Key Data Format (576 bytes)
+
+Both CMD 0x23 (write) and CMD 0xF5 (read) use the same format:
+144 entries of 4 bytes each.
+
+```
+Byte:  0       1       2       3       4       5       6       7
+     +-------+-------+-------+-------+-------+-------+-------+-------+
+     | pos_0 |  R_0  |  G_0  |  B_0  | pos_1 |  R_1  |  G_1  |  B_1  |
+     +-------+-------+-------+-------+-------+-------+-------+-------+
+     ...
+```
+
+| Field | Size | Description |
+|-------|------|-------------|
+| pos | 1 | Key position index (`0x00`–`0x8F`) |
+| R | 1 | Red 0–255 |
+| G | 1 | Green 0–255 |
+| B | 1 | Blue 0–255 |
+
+Entries with R=G=B=0 are either unused positions (no physical key) or
+keys with no per-key colour set.
 
 ---
 
