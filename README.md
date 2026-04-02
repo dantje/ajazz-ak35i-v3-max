@@ -21,6 +21,7 @@ and the RGB key lighting, without requiring root access.
 | `list` | List all detected HID interfaces |
 | `time` | Sync the display clock to system time |
 | `light` | Set RGB lighting mode and colour |
+| `keys` | Show or set per-key RGB lighting |
 | `solid` | Fill the display with a solid colour |
 | `image` | Upload a static image (PNG, JPG, BMP, GIF) |
 | `animation` | Upload an animated GIF (up to 141 frames) |
@@ -42,7 +43,7 @@ The OS switch (Win/MAC) does not affect the protocol.
 
 ```bash
 make package
-sudo dpkg -i build/ajazz-ak35i-0.2.0-Linux.deb
+sudo dpkg -i build/ajazz-ak35i-0.3.0-Linux.deb
 ```
 
 This installs the binary to `/usr/bin/ajazz` and the udev rule to
@@ -142,6 +143,61 @@ ajazz light -m off                            # backlight off
 | `--brightness` | `5` | 0 (off) – 5 (full) |
 | `--speed` | `3` | 0 (slow) – 5 (fast) |
 | `--direction` | `0` | 0=left, 1=down, 2=up, 3=right |
+
+### keys
+
+Show or set per-key RGB lighting. Without write flags, displays the live
+per-key colour state. With write flags, performs a read-modify-write cycle:
+reads the current flash table, applies your changes, and writes back.
+
+```bash
+ajazz keys                                    # show live key colours
+ajazz keys --all                              # include unlit keys
+
+# Set individual keys or groups
+ajazz keys --set w 255 0 0                    # W → red (others unchanged)
+ajazz keys --set wasd red                     # WASD → red (CSS name)
+ajazz keys --set w,a,s,d '#FF0000'            # comma list + hex colour
+
+# HSV input (QMK-style 8-bit: H=0-255, S=0-255, V=0-255)
+ajazz keys --hsv wasd 0 255 255               # WASD → red via HSV
+
+# Base colour + overrides
+ajazz keys --base navy --set wasd red         # navy base, red WASD
+ajazz keys --base 0 0 20 --set wasd 255 0 0  # dim blue base, red WASD
+
+# Build from scratch
+ajazz keys --clear --set frow 0 200 0 --set wasd 255 0 0
+
+# Brightness only (no re-upload)
+ajazz keys --brightness 50                    # 50% brightness
+```
+
+**Colour input** accepts CSS color names (`red`, `rebeccapurple`, `off`),
+`#RRGGBB` hex, or three integers `R G B` (each 0–255).
+
+**Key specifiers:**
+
+| Form | Example | Meaning |
+|------|---------|---------|
+| Name | `w` | Single key by name |
+| Comma list | `w,a,s,d` | Explicit set of keys |
+| Named group | `wasd` | Curated group (see below) |
+| Numeric | `39` | Decimal light_index |
+
+**Named groups:** `frow`, `numrow`, `qrow`, `homerow`, `shiftrow`, `bottom`,
+`arrows`, `nav`, `syskeys`, `numpad`, `wasd`, `alphas`, `mods`, `all`
+
+**Options:**
+
+| Option | Default | Description |
+|--------|---------|-------------|
+| `-a, --all` | off | Show all 144 key slots (including zero-RGB) |
+| `--clear` | — | Start from all-off before applying `--set`/`--hsv` |
+| `--base` | — | Start from a solid base colour (CSS name, `#hex`, or `R G B`) |
+| `-s, --set` | — | Set key colour: `KEY COLOR` (repeatable, left-to-right) |
+| `--hsv` | — | Set key colour via HSV: `KEY H S V` (repeatable, after `--set`) |
+| `-b, --brightness` | `100` | Per-key brightness 0–100% (maps to firmware 0–5) |
 
 ### solid
 

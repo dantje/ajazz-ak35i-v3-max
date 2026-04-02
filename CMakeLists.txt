@@ -1,7 +1,7 @@
 cmake_minimum_required(VERSION 3.16)
 
 project(ajazz
-    VERSION 0.2.0
+    VERSION 0.3.0
     DESCRIPTION "Ajazz AK35I V3 MAX keyboard control"
     LANGUAGES CXX)
 
@@ -29,6 +29,7 @@ target_compile_options(ajazz PRIVATE -Wall -Wextra -Wpedantic)
 # ---------------------------------------------------------------------------
 include(GNUInstallDirs)
 install(TARGETS ajazz DESTINATION ${CMAKE_INSTALL_BINDIR})
+install(FILES ajazz.1 DESTINATION ${CMAKE_INSTALL_MANDIR}/man1)
 install(FILES udev/99-ajazz-ak35i.rules DESTINATION /etc/udev/rules.d)
 
 # ---------------------------------------------------------------------------

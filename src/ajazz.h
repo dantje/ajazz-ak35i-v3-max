@@ -62,12 +62,50 @@ enum class LightMode : uint8_t {
     Pulsating = 0x11,
     Tilt      = 0x12,
     Shuttle   = 0x13,
+    Custom    = 0x80,   // per-key custom mode
+    PerKey    = 0x80,   // alias exposed via CLI ("perkey" / "per-key")
 };
 
 // Parse a lighting mode from a name (case-insensitive, e.g. "breath") or a
 // numeric string (decimal or hex, e.g. "7" or "0x07").
 // Returns true on success, false if not recognised.
 bool parse_light_mode(const std::string& s, LightMode& out);
+
+// Return the canonical lowercase name for a LightMode (e.g. "breath").
+// Returns "0xNN" for unrecognised values.
+std::string light_mode_name(LightMode m);
+
+// ---------------------------------------------------------------------------
+// Key index lookup  (light_index values, 1-based)
+// ---------------------------------------------------------------------------
+
+// Parse a key identifier to a light_index (1-based).  Accepts:
+//   - key name  (case-insensitive): "w", "enter", "up", "num7", ...
+//   - decimal number: "39"
+//   - hex number:     "0x27"
+// Returns true on success, false if not recognised.
+bool parse_key_index(const std::string& s, uint8_t& out);
+
+// Resolve a key specifier to a list of light_index values.
+// Accepts: single key name, comma-separated list (e.g. "w,a,s,d"),
+//          named group (e.g. "wasd", "frow", "all"), or decimal/hex index.
+// Returns false (out unchanged) if any token is unrecognised.
+bool resolve_key_set(const std::string& spec, std::vector<uint8_t>& out);
+
+// Convert QMK-style 8-bit HSV (h, s, v each 0-255) to RGB (each 0-255).
+// Hue 0=red, 85=green, 170=blue (maps 0-255 to 0-360 degrees).
+void hsv_to_rgb(uint8_t h, uint8_t s, uint8_t v,
+                uint8_t& r, uint8_t& g, uint8_t& b);
+
+// Return the shortest key name for a given light_index, or "" if unknown.
+std::string index_to_key_name(uint8_t light_index);
+
+// Parse a CSS color name (e.g. "rebeccapurple") or "#RRGGBB" hex to RGB.
+// Returns false if the string is not a recognised color name or hex code.
+bool parse_color_name(const std::string& s, uint8_t& r, uint8_t& g, uint8_t& b);
+
+// Return the CSS name for an exact RGB match, or "" if none.
+std::string color_name_from_rgb(uint8_t r, uint8_t g, uint8_t b);
 
 // ---------------------------------------------------------------------------
 // Lighting options
@@ -124,6 +162,21 @@ public:
                     uint8_t slot = 1, bool save = true,
                     bool header = true);
 
+    // Read live per-key RGB state via CMD 0xF5.
+    // Returns 576 bytes: 144 x {pos, R, G, B}.
+    std::vector<uint8_t> read_perkey_live();
+
+    // Read stored per-key custom lighting from flash via CMD 0x22.
+    // Returns 576 bytes: 144 x {pos, R, G, B}.
+    std::vector<uint8_t> read_custom_light();
+
+    struct KeyColor { uint8_t index, r, g, b; };
+
+    // Upload per-key RGB: {index, R, G, B} x up to 143 keys.
+    // Sends 9 data packets (576 bytes) to flash, then sets mode 0x80.
+    void set_custom_lighting(const std::vector<KeyColor>& keys,
+                             uint8_t brightness = 5);
+
 private:
     bool _verbose;
     bool _quiet;
@@ -133,6 +186,7 @@ private:
     void _send_feature(const uint8_t* payload, bool read_ack = false) const;
     std::vector<uint8_t> _read_ack() const;    // returns 64-byte payload
     void _read_disp_ack() const;               // ACK read on display interface (300ms timeout)
+    std::vector<uint8_t> _read_bulk(uint8_t cmd, size_t n_packets, uint8_t arg2 = 1) const;
     void _log(const std::string& msg) const;
 };
 

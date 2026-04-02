@@ -1,0 +1,314 @@
+.TH AJAZZ 1 "April 2026" "ajazz 0.3.0" "User Commands"
+.SH NAME
+ajazz \- control the Ajazz AK35I V3 MAX keyboard display and lighting
+.SH SYNOPSIS
+.B ajazz
+[\fB\-v\fR|\fB\-q\fR]
+.I command
+[\fIoptions\fR]
+.br
+.B ajazz
+\fB\-h\fR
+.br
+.B ajazz
+.I command
+\fB\-h\fR
+.SH DESCRIPTION
+.B ajazz
+is an unofficial Linux command-line tool for controlling the Ajazz AK35I V3 MAX
+keyboard (USB VID 0x0C45, PID 0x8009). It can synchronize the on-screen clock,
+configure RGB key backlighting, and upload static images or animated GIFs to
+the keyboard's 1.14-inch TFT display (240\[mu]135 pixels). No root access is
+required when the provided udev rules are installed.
+
+The keyboard's back switch must be set to \fBUSB\fR mode.
+.SH GLOBAL OPTIONS
+Global options must appear \fIbefore\fR the subcommand.
+.TP
+\fB\-v\fR, \fB\-\-verbose\fR
+Print HID protocol debug messages.
+.TP
+\fB\-q\fR, \fB\-\-quiet\fR
+Suppress all output except errors.
+.TP
+\fB\-h\fR, \fB\-\-help\fR
+Show help text and exit.
+.SH COMMANDS
+.SS list
+List all HID interfaces detected for connected Ajazz keyboards.
+.PP
+.RS 4
+.B ajazz list
+.RE
+.SS time
+Synchronize the keyboard's on-board real-time clock to the system time.
+The clock runs autonomously afterward and does not need repeated updates.
+.PP
+.RS 4
+.B ajazz time
+.br
+.B ajazz time \-\-at \fITIME\fR
+.RE
+.TP
+\fB\-\-at\fR \fITIME\fR
+Set to a specific time instead of now.
+.I TIME
+may be \fBHH:MM:SS\fR (today's date) or \fBYYYY-MM-DDTHH:MM:SS\fR (ISO 8601).
+.SS light
+Configure RGB key backlighting. Settings are saved to flash and persist across
+power cycles.
+.PP
+.RS 4
+.B ajazz light
+[\fB\-m\fR \fIMODE\fR] [\fB\-r\fR \fIN\fR] [\fB\-g\fR \fIN\fR] [\fB\-b\fR \fIN\fR]
+[\fB\-\-rainbow\fR] [\fB\-\-brightness\fR \fIN\fR] [\fB\-\-speed\fR \fIN\fR] [\fB\-\-direction\fR \fIN\fR]
+.RE
+.TP
+\fB\-m\fR, \fB\-\-mode\fR \fIMODE\fR
+Lighting animation mode (default: \fBstatic\fR). May be a name or a hex value
+\fB0x00\fR\(en\fB0x13\fR. Available modes:
+.RS
+.PP
+\fBoff\fR, \fBstatic\fR, \fBsingleon\fR, \fBsingleoff\fR, \fBglitter\fR, \fBfalling\fR,
+\fBcolourful\fR, \fBbreath\fR, \fBspectrum\fR, \fBoutward\fR, \fBscrolling\fR,
+\fBrolling\fR, \fBrotating\fR, \fBexplode\fR, \fBlaunch\fR, \fBripples\fR,
+\fBflowing\fR, \fBpulsating\fR, \fBtilt\fR, \fBshuttle\fR
+.RE
+.TP
+\fB\-r\fR, \fB\-\-red\fR \fIN\fR
+Red component 0\(en255 (default: 255).
+.TP
+\fB\-g\fR, \fB\-\-green\fR \fIN\fR
+Green component 0\(en255 (default: 255).
+.TP
+\fB\-b\fR, \fB\-\-blue\fR \fIN\fR
+Blue component 0\(en255 (default: 255).
+.TP
+\fB\-\-rainbow\fR
+Enable multicolour cycling mode (overrides \-r/\-g/\-b values).
+.TP
+\fB\-\-brightness\fR \fIN\fR
+Brightness level 0\(en5, where 0 is off and 5 is full (default: 5).
+.TP
+\fB\-\-speed\fR \fIN\fR
+Animation speed 0\(en5, where 0 is slowest and 5 is fastest (default: 3).
+.TP
+\fB\-\-direction\fR \fIN\fR
+Animation direction: 0=left, 1=down, 2=up, 3=right (default: 0).
+.SS keys
+Show or set per-key RGB lighting. Without write flags, displays the live
+per-key colour state. With write flags, performs a read-modify-write cycle:
+reads the current flash table, applies changes, and writes the result back.
+.PP
+.RS 4
+.B ajazz keys
+[\fB\-a\fR]
+.br
+.B ajazz keys
+[\fB\-\-clear\fR] [\fB\-\-base\fR \fICOLOR\fR]
+[\fB\-s\fR \fIKEY COLOR\fR] ...
+[\fB\-\-hsv\fR \fIKEY H S V\fR] ...
+[\fB\-b\fR \fIPCT\fR]
+.RE
+.TP
+\fB\-a\fR, \fB\-\-all\fR
+Show all 144 key slots, including those with zero RGB (default: only lit keys).
+.TP
+\fB\-\-clear\fR
+Start from all-off instead of reading the current state. Use with \fB\-\-set\fR
+or \fB\-\-hsv\fR to build a layout from scratch.
+.TP
+\fB\-\-base\fR \fICOLOR\fR|\fIR G B\fR
+Start from a solid base colour instead of reading the current state. Accepts
+a CSS color name, \fB#RRGGBB\fR hex, or three integers 0\(en255.
+.TP
+\fB\-s\fR, \fB\-\-set\fR \fIKEY\fR \fICOLOR\fR|\fIR G B\fR
+Set the colour for \fIKEY\fR. Repeatable; entries are applied left-to-right,
+later entries override earlier ones for the same key.
+\fIKEY\fR accepts a single key name (\fBw\fR), a comma-separated list
+(\fBw,a,s,d\fR), a named group (\fBwasd\fR), or a numeric light_index.
+\fICOLOR\fR accepts a CSS color name (\fBred\fR, \fBrebeccapurple\fR),
+\fB#RRGGBB\fR hex, or three integers \fIR G B\fR (each 0\(en255).
+.TP
+\fB\-\-hsv\fR \fIKEY H S V\fR
+Set the colour for \fIKEY\fR using QMK-style 8-bit HSV. \fIH\fR 0\(en255
+(0=red, 85=green, 170=blue), \fIS\fR 0\(en255, \fIV\fR 0\(en255.
+Applied after all \fB\-\-set\fR entries.
+.TP
+\fB\-b\fR, \fB\-\-brightness\fR \fIPCT\fR
+Per-key brightness 0\(en100% (default: 100). Maps to firmware levels 0\(en5.
+When used alone (without \fB\-\-set\fR/\fB\-\-hsv\fR), updates brightness
+without re-uploading per-key data.
+.PP
+.B Named groups:
+\fBfrow\fR, \fBnumrow\fR, \fBqrow\fR, \fBhomerow\fR, \fBshiftrow\fR,
+\fBbottom\fR, \fBarrows\fR, \fBnav\fR, \fBsyskeys\fR, \fBnumpad\fR,
+\fBwasd\fR, \fBalphas\fR, \fBmods\fR, \fBall\fR.
+.SS solid
+Fill the display with a solid colour.
+.PP
+.RS 4
+.B ajazz solid
+[\fB\-r\fR \fIN\fR] [\fB\-g\fR \fIN\fR] [\fB\-b\fR \fIN\fR]
+.RE
+.PP
+Options \fB\-r\fR/\fB\-g\fR/\fB\-b\fR are the same as for \fBlight\fR.
+Defaults are red=255, green=0, blue=0.
+.SS image
+Upload a static image to the display. The image is scaled to 240\[mu]135 pixels.
+.PP
+.RS 4
+.B ajazz image
+[\fB\-\-fill\fR]
+.I FILE
+.RE
+.PP
+Accepted formats: PNG, JPG, BMP, GIF (first frame only), and pre-converted
+\fB.raw\fR files (256-byte header followed by RGB565-LE pixel data).
+.TP
+\fB\-\-fill\fR
+Scale to fill the display with centre-crop (no black bars, edges may be clipped).
+Without this flag, the image is letterboxed to preserve aspect ratio.
+.SS animation
+Upload an animated GIF to the display. The firmware supports a maximum of
+141 frames; longer animations are truncated automatically. Frame delays outside
+the range 2\(en510\~ms are clamped. A progress bar is shown during the upload,
+which takes roughly 78\~seconds for a 141-frame animation.
+.PP
+.RS 4
+.B ajazz animation
+[\fB\-\-fill\fR]
+.I FILE
+.RE
+.PP
+Accepts the same formats as \fBimage\fR plus multi-frame GIFs.
+\fB\-\-fill\fR behaves identically to the \fBimage\fR subcommand.
+.SH CONFIGURATION
+.SS Udev rules
+The file \fI/etc/udev/rules.d/99-ajazz-ak35i.rules\fR grants access to the
+keyboard's HID devices without root privileges:
+.PP
+.RS 4
+.nf
+SUBSYSTEM=="hidraw", ATTRS{idVendor}=="0c45", ATTRS{idProduct}=="8009", \\
+    MODE="0660", GROUP="plugdev", TAG+="uaccess"
+.fi
+.RE
+.PP
+The \fBTAG+="uaccess"\fR rule automatically grants access to the logged-in
+local desktop user via \fBsystemd-logind\fR(8). For SSH or non-seat sessions,
+add yourself to the \fBplugdev\fR group and re-login:
+.PP
+.RS 4
+sudo usermod \-aG plugdev "$USER"
+.RE
+.SH EXIT STATUS
+.TP
+.B 0
+Success.
+.TP
+.B 1
+Parse error, device not found, or runtime failure (message printed to stderr).
+.SH EXAMPLES
+List detected interfaces:
+.PP
+.RS 4
+.B ajazz list
+.RE
+.PP
+Sync the clock to the current time:
+.PP
+.RS 4
+.B ajazz time
+.RE
+.PP
+Set solid red backlighting with breathing animation at half speed:
+.PP
+.RS 4
+.B ajazz light \-m breath \-r 255 \-g 0 \-b 0 \-\-speed 2
+.RE
+.PP
+Cycle through the full colour spectrum:
+.PP
+.RS 4
+.B ajazz light \-m spectrum \-\-rainbow
+.RE
+.PP
+Fill the display with black (clear it):
+.PP
+.RS 4
+.B ajazz solid \-r 0 \-g 0 \-b 0
+.RE
+.PP
+Upload a photo, letterboxed to fit:
+.PP
+.RS 4
+.B ajazz image photo.jpg
+.RE
+.PP
+Upload a photo scaled to fill the screen:
+.PP
+.RS 4
+.B ajazz image \-\-fill photo.jpg
+.RE
+.PP
+Upload an animated GIF:
+.PP
+.RS 4
+.B ajazz animation loop.gif
+.RE
+.PP
+Show live per-key colours:
+.PP
+.RS 4
+.B ajazz keys
+.RE
+.PP
+Set WASD keys to red (read-modify-write, other keys unchanged):
+.PP
+.RS 4
+.B ajazz keys \-\-set wasd red
+.RE
+.PP
+Dim blue base with red WASD:
+.PP
+.RS 4
+.B ajazz keys \-\-base 0 0 20 \-\-set wasd 255 0 0
+.RE
+.PP
+Build a layout from scratch (all-off, then green F-row, red WASD):
+.PP
+.RS 4
+.B ajazz keys \-\-clear \-\-set frow 0 200 0 \-\-set wasd 255 0 0
+.RE
+.PP
+Rainbow rows using HSV:
+.PP
+.RS 4
+.nf
+ajazz keys \-\-clear \\
+  \-\-hsv frow 0 255 200 \\
+  \-\-hsv numrow 30 255 200 \\
+  \-\-hsv qrow 85 255 200 \\
+  \-\-hsv homerow 128 255 200 \\
+  \-\-hsv shiftrow 170 255 200 \\
+  \-\-hsv bottom 213 255 200
+.fi
+.RE
+.SH FILES
+.TP
+.I /etc/udev/rules.d/99-ajazz-ak35i.rules
+udev rules granting unprivileged HID access.
+.SH NOTES
+This is an unofficial, community-written tool with no affiliation with Ajazz or
+the keyboard's manufacturer. The HID protocol was reverse-engineered; see
+\fIPROTOCOL.md\fR in the source distribution for details.
+.PP
+Display content and lighting settings are stored in the keyboard's flash memory
+and survive power cycles.
+.SH BUGS
+Report issues at the project repository on GitHub.
+.SH AUTHORS
+Daniel van Gerpen.
+.SH LICENSE
+MIT License. See \fILICENSE\fR in the source distribution.

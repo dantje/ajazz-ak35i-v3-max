@@ -123,7 +123,7 @@ discarded after each command that requires it (see operation sequences in §7).
 |------|------|------|-----|----------|
 | `0x02` | `CMD_SAVE` | `0x00` | yes | Commit / persist the current transaction |
 | `0x18` | `CMD_START` | `0x01` | yes | Begin a session |
-| `0xF0` | `CMD_FINISH` | `0x01` | no | End transaction (post-save cleanup; can be omitted) |
+| `0xF0` | `CMD_FINISH` | `0x01` | yes | End transaction (post-save cleanup) |
 
 ### 6.2 Write Commands
 
@@ -229,10 +229,9 @@ Byte:  8       9      10      11–61   62      63
 ```
 Step  Packet                                                    ACK
 ────  ──────────────────────────────────────────────────────    ───
- 1.   CMD_START     [04 18 00 00 00 00 00 00 01 00 … 00]       yes
- 2.   CMD_LIGHTING  [04 13 00 00 00 00 00 00 01 00 … 00]       yes
- 3.   Lighting data (see §7.2.1)                               no
- 4.   CMD_SAVE      [04 02 00 00 00 00 00 00 00 00 … 00]       yes
+ 1.   CMD_LIGHTING  [04 13 00 00 00 00 00 00 01 00 … 00]       yes
+ 2.   Lighting data (see §7.2.1)                               yes
+ 3.   CMD_SAVE      [04 02 00 00 00 00 00 00 00 00 … 00]       yes
 ```
 
 #### 7.2.1 Lighting Data Payload (64 bytes)
@@ -407,8 +406,9 @@ Step  Packet                                                    ACK
 ────  ──────────────────────────────────────────────────────    ───
  1.   CMD_START        [04 18 00 00 00 00 00 00 01 00 … 00]    yes
  2.   CMD_CUSTOM_LIGHT [04 23 00 00 00 00 00 00 09 00 … 00]    yes
- 3.   Per-key data (9 × 64-byte packets = 576 bytes)           no
+ 3.   Per-key data (9 × 64-byte packets = 576 bytes)           yes
  4.   CMD_SAVE         [04 02 00 00 00 00 00 00 00 00 … 00]    yes
+ 5.   CMD_FINISH       [04 F0 00 00 00 00 00 00 00 00 … 00]    yes
 ```
 
 #### 7.4.2 Reading Live Per-Key State (CMD 0xF5)
@@ -424,7 +424,7 @@ Step  Packet                                                    ACK
  1.   CMD_READ_PERKEY  [04 F5 00 00 00 00 00 00 09 00 … 00]    yes*
  2.   9 × 64-byte data packets (576 bytes)                     n/a
  3.   CMD_SAVE         [04 02 00 00 00 00 00 00 00 00 … 00]    yes
- 4.   CMD_FINISH       [04 F0 00 00 00 00 00 00 00 00 … 00]    no
+ 4.   CMD_FINISH       [04 F0 00 00 00 00 00 00 00 00 … 00]    yes
 
  * The first HIDIOCGFEATURE response is an echo/ACK — discard it,
    then read 9 data packets (see §6.3 read protocol).

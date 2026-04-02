@@ -223,6 +223,90 @@ expect_no_device     "animation raw file"         animation "$DUMMY_RAW"
 expect_parse_error   "animation unknown option"   animation "$DUMMY_GIF" --unknown
 
 # ---------------------------------------------------------------------------
+# keys — per-key RGB lighting
+# ---------------------------------------------------------------------------
+echo "--- keys"
+expect_ok            "keys --help"                keys --help
+expect_ok            "keys -h"                    keys -h
+
+# Read mode (no write flags) — needs device
+expect_no_device     "keys (live read)"           keys
+expect_no_device     "keys --all"                 keys --all
+expect_no_device     "keys -a"                    keys -a
+# Write: --set with RGB integers
+expect_no_device     "keys --set w 255 0 0"       keys --set w 255 0 0
+expect_no_device     "keys --set wasd 255 0 0"    keys --set wasd 255 0 0
+expect_no_device     "keys --set w,a,s,d 255 0 0" keys --set w,a,s,d 255 0 0
+expect_no_device     "keys -s w 255 0 0"          keys -s w 255 0 0
+
+# Write: --set with CSS color names
+expect_no_device     "keys --set w red"           keys --set w red
+expect_no_device     "keys --set wasd rebeccapurple" keys --set wasd rebeccapurple
+expect_no_device     "keys --set all white"       keys --set all white
+expect_no_device     "keys --set w off"           keys --set w off
+
+# Write: --set with #hex
+expect_no_device     "keys --set w #FF0000"       keys --set w '#FF0000'
+
+# Write: --hsv
+expect_no_device     "keys --hsv wasd 0 255 255"  keys --hsv wasd 0 255 255
+expect_no_device     "keys --hsv frow 170 200 200" keys --hsv frow 170 200 200
+
+# Write: --clear
+expect_no_device     "keys --clear --set w red"   keys --clear --set w 255 0 0
+expect_no_device     "keys --clear alone"         keys --clear
+
+# Write: --base with RGB
+expect_no_device     "keys --base 0 0 20 --set wasd 255 0 0" keys --base 0 0 20 --set wasd 255 0 0
+
+# Write: --base with CSS name
+expect_no_device     "keys --base navy --set wasd red" keys --base navy --set wasd red
+
+# Write: --brightness
+expect_no_device     "keys --brightness 50"       keys --brightness 50
+expect_no_device     "keys -b 0"                  keys -b 0
+expect_no_device     "keys -b 100"                keys -b 100
+
+# Write: combined flags
+expect_no_device     "keys --clear --set frow green --set wasd red" \
+                     keys --clear --set frow 0 200 0 --set wasd 255 0 0
+expect_no_device     "keys --set + --hsv combined" \
+                     keys --clear --set all 0 0 20 --hsv wasd 0 255 255
+expect_no_device     "keys --brightness with --set" \
+                     keys --brightness 80 --set w red
+
+# Write: named groups
+expect_no_device     "keys --set frow"            keys --set frow 0 200 0
+expect_no_device     "keys --set numrow"          keys --set numrow 0 0 255
+expect_no_device     "keys --set qrow"            keys --set qrow 255 0 0
+expect_no_device     "keys --set homerow"         keys --set homerow 255 0 0
+expect_no_device     "keys --set shiftrow"        keys --set shiftrow 255 0 0
+expect_no_device     "keys --set bottom"          keys --set bottom 255 0 0
+expect_no_device     "keys --set arrows"          keys --set arrows 255 0 0
+expect_no_device     "keys --set nav"             keys --set nav 255 0 0
+expect_no_device     "keys --set syskeys"         keys --set syskeys 255 0 0
+expect_no_device     "keys --set numpad"          keys --set numpad 255 0 0
+expect_no_device     "keys --set alphas"          keys --set alphas 255 0 0
+expect_no_device     "keys --set mods"            keys --set mods 255 0 0
+
+# Write: numeric index
+expect_no_device     "keys --set numeric idx"     keys --set 39 255 0 0
+
+# Global flags with keys
+expect_no_device     "keys -v flag"               -v keys --clear --set w red
+expect_no_device     "keys -q flag"               -q keys --clear --set w red
+
+# Invalid
+expect_parse_error   "keys unknown option"        keys --unknown
+expect_parse_error   "keys --brightness out of range" keys --brightness 101
+expect_parse_error   "keys --brightness negative" keys --brightness -1
+
+# Invalid key/color errors: these reach the write path which tries to open
+# the device, so on a no-device system they fail with "not found" before
+# reaching the key/color validation.  We just verify they don't crash.
+# (Full validation would need the device or mocking.)
+
+# ---------------------------------------------------------------------------
 # Global flags can appear before subcommand
 # ---------------------------------------------------------------------------
 echo "--- global flag placement"
